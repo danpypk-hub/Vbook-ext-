@@ -1,4 +1,4 @@
-# Gemini soạn cách tạoVBOOK EXTENSION
+# Gemini soạn cách tạo VBOOK EXTENSION
 
 Tài liệu hướng dẫn chi tiết quy trình phát triển tiện ích (Extension) cho ứng dụng Vbook. Kiến thức được hệ thống hóa từ khâu thiết lập môi trường, kỹ thuật cào dữ liệu (Web Scraping), đối chiếu API gốc và xuất bản lên GitHub.
 
