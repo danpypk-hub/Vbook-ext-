@@ -1,127 +1,103 @@
-#  LẬP TRÌNH VBOOK EXTENSION (Gemini viết)
+ # Gemini soạn
 
-Tài liệu hướng dẫn chi tiết quy trình phát triển tiện ích (Extension) cho ứng dụng Vbook. Kiến thức được hệ thống hóa từ khâu thiết lập môi trường, công cụ, bóc tách dữ liệu (Scraping), đến xuất bản mã nguồn lên GitHub. Case study thực hành thực tế: `truyenmoiyy.com`.
+Tài liệu hướng dẫn chi tiết quy trình phát triển tiện ích (Extension) cho ứng dụng Vbook. Kiến thức được hệ thống hóa từ khâu thiết lập môi trường, bộ API lõi, kỹ thuật bóc tách dữ liệu (Scraping), đến xuất bản mã nguồn lên GitHub. Case study thực hành thực tế: `truyenmoiyy.com`.
 
-> *Tham khảo thêm mã nguồn các Vbook Extension hoàn thiện tại:* [https://github.com/dat-bi/ext-vbook](https://github.com/dat-bi/ext-vbook)
-
----
-
-## PHẦN 1: CÔNG CỤ VÀ MÔI TRƯỜNG PHÁT TRIỂN (BUILD & DEBUG)
-
-Extension Vbook đóng vai trò là "cầu nối", tải mã HTML của trang web, trích xuất dữ liệu và định dạng lại để hiển thị trên ứng dụng. Cần chuẩn bị môi trường phát triển như sau:
-
-### 1. Công cụ lập trình
-* **Trên Thiết bị di động:** Sử dụng ứng dụng `Vbook Ext Maker` (tải trên Android). Ứng dụng này hỗ trợ tạo khung tệp tin tự động, viết mã, chạy thử (Run/Preview) trực tiếp với URL thực tế và xuất tệp `.zip` tiện lợi.
-* **Trên Máy tính (Khuyến nghị):** Sử dụng phần mềm soạn thảo mã nguồn **Visual Studio Code (VSCode)** kết hợp trình duyệt **Google Chrome**.
-
-### 2. Thiết lập kết nối & Gỡ lỗi (Remote Debug)
-Phương pháp này giúp mã nguồn đồng bộ trực tiếp từ VSCode (máy tính) lên Vbook (điện thoại) theo thời gian thực mà không cần đóng gói tệp `.zip` nhiều lần.
-
-1.  **Lấy IP:** Đảm bảo máy tính và điện thoại truy cập chung một mạng Wifi. Mở Vbook trên điện thoại -> *Cài đặt* -> Kích hoạt chế độ *Gỡ lỗi (Debug)*. Hệ thống sẽ cung cấp một địa chỉ IP nội bộ (VD: `192.168.1.15:8080`).
-2.  **Kết nối:** Trên máy tính, mở trình duyệt Chrome, nhập địa chỉ IP trên vào thanh URL. Giao diện Vbook Extension Server sẽ xuất hiện.
-3.  **Kiểm thử (Test):** Viết mã trên VSCode, lưu lại. Kéo thả tệp `plugin.json` (hoặc cả thư mục dự án) vào giao diện web trên Chrome. App Vbook sẽ tự động nạp mã nguồn.
-4.  **Gỡ lỗi (Debug):** Nhấn **F12** trên Chrome (máy tính), chuyển sang tab `Console`. Bất kỳ lỗi logic hoặc cú pháp nào khi thao tác trên điện thoại đều được báo đỏ chi tiết tại đây.
-5.  **Đóng gói:** Khi hoàn thiện, nén thư mục thành tệp `.zip` (Lưu ý quan trọng: tệp `plugin.json` và `icon.png` phải nằm ở lớp ngoài cùng của tệp nén, không được nằm trong thư mục con).
+> *Tham khảo thêm mã nguồn các Vbook Extension hoàn thiện và tutorial gốc tại:* [https://github.com/dat-bi/ext-vbook](https://github.com/dat-bi/ext-vbook)
 
 ---
 
-## PHẦN 2: KIẾN TRÚC THƯ MỤC CỦA MỘT EXTENSION
+## PHẦN I: TỔNG QUAN KIẾN TRÚC VÀ BỘ TỪ ĐIỂN API LÕI
 
-Một extension đạt chuẩn bao gồm cấu trúc tệp tin sau:
+Một extension Vbook là một gói `.zip` chứa các mã lệnh JavaScript (chuẩn ES5) nhằm chuyển đổi mã HTML của một trang web thành dữ liệu cấu trúc cho ứng dụng.
 
+### 1. Cấu trúc thư mục chuẩn
 ```text
 Ten_Extension.zip/
-├── plugin.json       (Hồ sơ lõi: Định danh tên, tác giả, cấu hình URL)
-├── icon.png          (Ảnh đại diện tiện ích, tỷ lệ vuông 1:1)
-└── src/              (Thư mục chứa mã nguồn thực thi logic)
-    ├── home.js       (Màn hình chính: Chứa các Tab mặc định VD: Truyện mới đăng)
-    ├── genre.js      (Danh mục mở rộng: Danh sách Thể loại trong nút "Khám phá")
-    ├── gen.js        (Quét danh sách: Trích xuất hàng loạt truyện từ một chuyên mục)
-    ├── detail.js     (Quét chi tiết: Thông tin 1 bộ truyện như Tên, Tác giả, Số chương)
-    ├── page.js       (Hỗ trợ phân trang: Tính tổng số trang của mục lục nếu quá dài)
-    ├── toc.js        (Quét Mục lục: Trích xuất mảng liên kết các chương)
-    └── chap.js       (Quét nội dung: Lấy chữ của chương và cắt bỏ quảng cáo)
+├── plugin.json       # Metadata và cấu hình lõi (Bắt buộc)
+├── icon.png          # Icon đại diện 64x64px, tỷ lệ vuông 1:1 (Bắt buộc)
+└── src/              # Thư mục chứa mã nguồn thực thi
+    ├── home.js       # Màn hình chính (Chứa Tab mặc định VD: Truyện mới đăng)
+    ├── genre.js      # Danh mục mở rộng (Thể loại trong nút Khám phá thêm)
+    ├── search.js     # Tìm kiếm truyện
+    ├── gen.js        # Quét danh sách truyện từ một chuyên mục
+    ├── detail.js     # Chi tiết truyện (Tên, Tác giả, Thể loại, Số chương)
+    ├── page.js       # Phân trang mục lục (Tính tổng số trang nếu mục lục quá dài)
+    ├── toc.js        # Mục lục (Trích xuất mảng liên kết các chương)
+    └── chap.js       # Nội dung chương (Văn bản thuần và bộ lọc rác/quảng cáo)
 ```
+
+### 2. Bộ API hỗ trợ tích hợp sẵn (Vbook Core)
+Vbook cung cấp các hàm nội tại để tối ưu quá trình lấy dữ liệu:
+* **Mạng lưới (Network):**
+  * `fetch(url, options)`: Gửi request HTTP/HTTPS (GET, POST).
+  * `res.ok`: Kiểm tra trạng thái HTTP (true nếu mã 200).
+  * `res.html(charset)`: Trả về đối tượng Document (DOM) để truy vấn HTML.
+  * `res.json()`: Trả về dữ liệu JSON (Dành cho các trang dùng API).
+* **Truy vấn HTML (DOM Parser):**
+  * `doc.select(selector)`: Chọn phần tử theo CSS Selector.
+  * `element.text()`: Lấy văn bản thuần.
+  * `element.html()`: Lấy mã HTML bên trong.
+  * `element.attr(name)`: Lấy giá trị thuộc tính (VD: `href`, `src`).
+  * `element.remove()`: Xóa phần tử khỏi cây DOM (Thường dùng lọc quảng cáo).
+* **Phản hồi (Response):**
+  * `Response.success(data, next)`: Trả về dữ liệu thành công, `next` là tham số lật trang tiếp theo.
+  * `Response.error(message)`: Trả về thông báo lỗi lên giao diện.
 
 ---
 
-## PHẦN 3: KỸ THUẬT F12 & GIẢI PHẪU MÃ NGUỒN (TRUYENMOIYY.COM)
+## PHẦN II: CÔNG CỤ VÀ MÔI TRƯỜNG PHÁT TRIỂN (BUILD & DEBUG)
 
-Để trích xuất dữ liệu, bắt buộc phải biết thông tin nằm ở đoạn mã HTML nào. Công cụ **F12 (DevTools)** trên Chrome là công cụ then chốt.
+Để phát triển tiện ích, bạn có thể lựa chọn một trong hai quy trình làm việc trên **Máy tính (PC)**:
 
-**Cách thao tác:** Mở trang web -> Nhấn `F12` -> Nhấn biểu tượng **Mũi tên chéo** (Select an element) góc trên bên trái -> Rê chuột vào phần tử cần lấy trên giao diện web. Hệ thống sẽ bôi đậm đoạn mã HTML tương ứng.
+### 1. Sử dụng Vbook Extension Maker (Khuyến nghị cho người mới)
+Đây là một phần mềm chuyên dụng trên PC. Ứng dụng này hỗ trợ:
+* Tự động tạo khung dự án (Scaffolding).
+* Cung cấp môi trường viết mã trực tiếp.
+* Chạy thử (Run/Preview) và xem ngay kết quả bóc tách từ URL thực tế.
+* Xuất tệp `.zip` hoàn chỉnh chỉ với 1 click.
 
-Dưới đây là giải phẫu chi tiết, tách biệt giữa **Khung chuẩn (Template)** và **Mã thực tế (`truyenmoiyy.com`)**.
+### 2. Sử dụng VSCode + Gỡ lỗi Từ xa (Remote Debug)
+Đây là phương pháp dành cho lập trình viên, giúp đồng bộ mã nguồn trực tiếp từ máy tính lên ứng dụng trên điện thoại theo thời gian thực mà không cần nén tệp `.zip`.
+1. **Lấy IP:** Đảm bảo máy tính và điện thoại chung mạng Wifi. Mở Vbook trên điện thoại -> *Cài đặt* -> Bật *Gỡ lỗi (Debug)*. Hệ thống cung cấp IP (VD: `192.168.1.15:8080`).
+2. **Kết nối:** Mở trình duyệt Chrome trên máy tính, nhập IP vào thanh URL. Giao diện Vbook Extension Server xuất hiện.
+3. **Kiểm thử:** Viết mã trên Visual Studio Code (VSCode), kéo thả tệp `plugin.json` (hoặc cả thư mục dự án) vào giao diện web trên Chrome. App Vbook sẽ nạp mã ngay lập tức.
+4. **Gỡ lỗi:** Nhấn **F12** trên Chrome (máy tính), chuyển sang tab `Console`. Bất kỳ lỗi logic hoặc cú pháp nào khi thao tác trên điện thoại đều được báo đỏ tại đây.
+
+---
+
+## PHẦN III: KỸ THUẬT F12 & GIẢI PHẪU MÃ NGUỒN (TRUYENMOIYY.COM)
+
+Công cụ **F12 (DevTools)** trên Chrome giúp xác định dữ liệu nằm ở thẻ HTML nào.
+*Cách dùng:* Mở trang web -> Nhấn `F12` -> Nhấn biểu tượng **Mũi tên chéo** (Select an element) góc trái -> Rê chuột vào phần tử cần lấy.
 
 ### 1. Tệp Hồ sơ `plugin.json`
-**Mục đích:** Khai báo cấu hình tiện ích cho hệ thống Vbook.
+Khai báo cấu hình định danh.
 
 ```json
-// ==========================================
-// 📌 KHUNG CODE CHUNG (TEMPLATE)
-// ==========================================
-{
-  "metadata": {
-    "name": "Tên Website",
-    "author": "[Tên_Của_Bạn]",
-    "version": 1,
-    "source": "[https://domain.com](https://domain.com)",
-    "regexp": "domain\\.com", 
-    "description": "Mô tả tiện ích",
-    "type": "novel", 
-    "locale": "vi_VN",
-    "language": "javascript"
-  },
-  "script": { 
-    "home": "home.js",
-    "genre": "genre.js",
-    "detail": "detail.js",
-    "toc": "toc.js",
-    "chap": "chap.js"
-  }
-}
-```
-
-```json
-// ==========================================
-// 🎯 CODE THỰC TẾ (TRUYENMOIYY.COM)
-// ==========================================
 {
   "metadata": {
     "name": "Truyện Mới YY",
     "author": "[Tên_Của_Bạn]",
-    "version": 0.1,
+    "version": 1,
     "source": "[https://truyenmoiyy.com](https://truyenmoiyy.com)",
     "regexp": "truyenmoiyy\\.com",
-    "description": "Bổ sung chuẩn hiển thị và thuật toán lật trang mục lục.",
+    "description": "Tiện ích tối ưu tốc độ cho Truyện Mới YY",
+    "type": "novel",
     "locale": "vi_VN",
-    "language": "javascript",
-    "type": "novel"
+    "language": "javascript"
   },
   "script": {
-    "home": "home.js",
-    "genre": "genre.js",
-    "detail": "detail.js",
-    "page": "page.js",
-    "toc": "toc.js",
-    "chap": "chap.js",
-    "search": "search.js"
+    "home": "home.js", "genre": "genre.js", "detail": "detail.js",
+    "page": "page.js", "toc": "toc.js", "chap": "chap.js", "search": "search.js"
   }
 }
 ```
 
----
+### 2. Thiết kế Màn hình chính (`home.js`) & Khám phá (`genre.js`)
+Để tối ưu giao diện, `home.js` chỉ chứa các tab mặc định (VD: Truyện mới đăng, Truyện Hot). Toàn bộ thể loại chi tiết (Tiên hiệp, Kiếm hiệp...) được chuyển vào `genre.js` để ẩn gọn trong nút menu **Khám phá thêm**.
 
-### 2. Thiết kế Màn hình chính (`home.js`) và Khám phá (`genre.js`)
-**Chiến lược thiết kế:** Để tối ưu giao diện, `home.js` chỉ nên chứa 1-3 tab chính hiển thị ngay khi mở tiện ích (Ví dụ: *Truyện mới đăng*). Toàn bộ các chuyên mục hoặc thể loại khác (Tiên hiệp, Ngôn tình...) sẽ được đưa vào `genre.js` để ẩn gọn trong nút menu **Khám phá thêm**.
-
-#### A. Tệp `src/home.js` (Tab Mặc định)
-Khai báo tĩnh các chuyên mục chính nhất. Không cần dùng F12, chỉ cần sao chép liên kết từ thanh menu của trang web.
-
+**`src/home.js` (Tab Mặc định):**
 ```javascript
-// ==========================================
-// 🎯 CODE THỰC TẾ (TRUYENMOIYY.COM)
-// ==========================================
 function execute() {
     return Response.success([
         { title: "Mới Cập Nhật", input: "/danh-sach/truyen-moi", script: "gen.js" },
@@ -130,20 +106,15 @@ function execute() {
 }
 ```
 
-#### B. Tệp `src/genre.js` (Trích xuất Thể loại động)
-**Thao tác F12:** Mở trang chủ `https://truyenmoiyy.com/`. Rê chuột vào thanh menu thả xuống chứa các thể loại. Bấm F12. Khối danh sách thể loại nằm trong `<ul class="dropdown-menu multi-column">`, mỗi thể loại là một thẻ `<li>` chứa thẻ `<a>`.
-
+**`src/genre.js` (Trích xuất Thể loại động):**
+*Thao tác F12:* Rê chuột vào thanh menu Thể loại trên trang chủ. Bấm F12, thấy danh sách nằm trong `<ul class="dropdown-menu multi-column">`.
 ```javascript
-// ==========================================
-// 🎯 CODE THỰC TẾ (TRUYENMOIYY.COM)
-// ==========================================
 function execute() {
     var res = fetch("[https://truyenmoiyy.com/](https://truyenmoiyy.com/)");
     if (!res.ok) return null;
     var doc = res.html('utf-8');
     var data = [];
     
-    // Quét toàn bộ thẻ 'a' nằm trong menu thể loại
     doc.select(".dropdown-menu.multi-column li a").forEach(function(e) {
         data.push({
             title: e.text().trim(),
@@ -151,46 +122,18 @@ function execute() {
             script: "gen.js"
         });
     });
-    
     return Response.success(data);
 }
 ```
 
----
-
 ### 3. Trích xuất Danh sách truyện (`src/gen.js`)
-**Mục đích:** Vào trang danh mục, trích xuất Tên, Ảnh, Link của nhiều truyện cùng lúc.
-**Thao tác F12:** Mở URL `https://truyenmoiyy.com/danh-sach/truyen-moi`. Bấm F12, trỏ vào một cuốn truyện. Thông tin truyện được bọc trong khối `<div class="row" itemscope>`. Bắt buộc phải dùng khối bọc này làm "Container" để vòng lặp `.forEach()` quét từng truyện mà không bị lẫn lộn dữ liệu.
+*Thao tác F12:* Mở `https://truyenmoiyy.com/danh-sach/truyen-moi`. Trỏ vào một cuốn truyện. Thông tin truyện bọc trong `<div class="row" itemscope>`. Sử dụng khối này làm "Container" vòng lặp.
 
 ```javascript
-// ==========================================
-// 📌 KHUNG CODE CHUNG (TEMPLATE)
-// ==========================================
-function execute(url, page) {
-    var res = fetch(url + "?page=" + (page || '1')); 
-    var doc = res.html();
-    var data = [];
-    
-    doc.select("KHỐI_BỌC_TRUYỆN_CONTAINER").forEach(function(e) {
-        data.push({
-            name: e.select("THẺ_TÊN").text().trim(),
-            link: e.select("THẺ_LINK").attr("href"),
-            cover: e.select("THẺ_ẢNH").attr("src"),
-            host: "[https://domain.com](https://domain.com)"
-        });
-    });
-    return Response.success(data, "TRANG_TIẾP_THEO");
-}
-```
-
-```javascript
-// ==========================================
-// 🎯 CODE THỰC TẾ (TRUYENMOIYY)
-// ==========================================
 function execute(url, page) {
     if (!page) page = '1';
     
-    // Xử lý logic URL đặc thù: Web này dùng /trang-1 thay vì ?page=1
+    // Web dùng định dạng /trang-1 thay vì ?page=1
     var fetchUrl = url;
     if (fetchUrl.indexOf("http") !== 0) fetchUrl = "[https://truyenmoiyy.com](https://truyenmoiyy.com)" + url;
     fetchUrl = fetchUrl + "/trang-" + page;
@@ -200,7 +143,7 @@ function execute(url, page) {
     var doc = res.html('utf-8');
     var data = [];
 
-    // Chọn Container chứa thông tin của từng truyện
+    // Chọn Container chứa thông tin 1 truyện
     doc.select(".list-truyen .row[itemscope]").forEach(function(e) {
         var a = e.select(".truyen-title a").first(); 
         var img = e.select("img[itemprop=image]").first();
@@ -220,7 +163,7 @@ function execute(url, page) {
         }
     });
 
-    // Lật trang: Kiểm tra xem có thẻ a nào chứa thuộc tính rel=next hay không
+    // Tính toán số trang kế tiếp
     var hasNext = doc.select(".pagination li a[rel=next]").length > 0;
     if (hasNext) return Response.success(data, (parseInt(page) + 1).toString());
     
@@ -228,53 +171,26 @@ function execute(url, page) {
 }
 ```
 
----
-
 ### 4. Trích xuất Chi tiết truyện (`src/detail.js`)
-**Mục đích:** Lấy siêu dữ liệu (Metadata) như Tác giả, Mô tả, Số chương của 1 truyện.
-**Thao tác F12:** Mở URL `https://truyenmoiyy.com/no-le-bong-toi-q7-lang-mo-ariel/`.
-* **Tên truyện:** Trỏ vào tên truyện -> Thấy nằm trong `<h1 class="story-title">`.
-* **Tác giả:** Trỏ vào tên tác giả -> Thấy nằm trong `<a itemprop="name">` thuộc khối cha `.author`.
-* **Số chương:** Trỏ vào vùng có ghi số chương. Khối HTML thường bị phân mảnh hoặc không có thẻ bọc riêng. **Giải pháp:** Quét toàn bộ văn bản thuần trên trang bằng `doc.text()` và dùng `Regex` (biểu thức chính quy) để bắt chính xác con số.
+*Thao tác F12:* Mở URL một bộ truyện.
+* Tên truyện: Nằm trong `<h1 class="story-title">`.
+* Tác giả: Nằm trong `<a itemprop="name">` thuộc `.author`.
+* Số chương: HTML thường phân mảnh, do đó quét toàn văn `doc.text()` và dùng `Regex` để bắt số.
 
 ```javascript
-// ==========================================
-// 📌 KHUNG CODE CHUNG (TEMPLATE)
-// ==========================================
-function execute(url) {
-    var res = fetch(url);
-    var doc = res.html();
-    
-    return Response.success({
-        name: doc.select("THẺ_TÊN").text().trim(),
-        cover: doc.select("THẺ_ẢNH").attr("src"),
-        author: doc.select("THẺ_TÁC_GIẢ").text().trim(),
-        description: doc.select("THẺ_MÔ_TẢ").text().trim(),
-        detail: "Hiển thị thông tin phụ",
-        host: "[https://domain.com](https://domain.com)"
-    });
-}
-```
-
-```javascript
-// ==========================================
-// 🎯 CODE THỰC TẾ (TRUYENMOIYY)
-// ==========================================
 function execute(url) {
     var res = fetch(url);
     if (!res.ok) return null;
     var doc = res.html('utf-8');
     
-    // Ưu tiên class .story-title, dùng thẻ h1 làm lớp dự phòng (||)
     var name = doc.select(".story-title").text().trim() || doc.select("h1").text().trim();
     var cover = doc.select(".book img").first().attr("src");
     if (cover && cover.indexOf("http") !== 0) cover = "[https://truyenmoiyy.com](https://truyenmoiyy.com)" + cover;
     
     var authorEl = doc.select("[itemprop=author] [itemprop=name]").first() || doc.select(".author").first();
-    // Loại bỏ chuỗi "Tác giả:" thừa bị dính liền trong text
     var author = authorEl ? authorEl.text().replace(/Tác giả\s*:/i, "").trim() : "Đang cập nhật";
     
-    // Kỹ thuật Regex: Dò tìm Số chương từ toàn bộ khối văn bản
+    // Regex lấy số chương từ văn bản thuần
     var rawText = doc.text(); 
     var chapters = "Đang cập nhật";
     var chapMatch = rawText.match(/Số [Cc]hương[\s:]*([\d,.]+)/);
@@ -289,46 +205,23 @@ function execute(url) {
         name: name,
         cover: cover,
         author: author,
-        description: doc.select(".desc-text").text().trim(), // Vị trí khối thẻ mô tả
+        description: doc.select(".desc-text").text().trim(),
         detail: detailInfo.join("<br>"),
         host: "[https://truyenmoiyy.com](https://truyenmoiyy.com)"
     });
 }
 ```
 
----
-
 ### 5. Trích xuất Mục lục (`src/toc.js`)
-**Mục đích:** Trích xuất toàn bộ liên kết của các chương vào một mảng.
-**Thao tác F12:** Vẫn ở URL chi tiết truyện `.../no-le-bong-toi-q7-lang-mo-ariel/`, cuộn xuống danh sách chương. Trỏ vào "Chương 1". Quan sát cây HTML sẽ thấy toàn bộ các chương được bọc trong danh sách `<ul class="list-chapter">`, mỗi chương là một thẻ `<li>` chứa thẻ `<a>`. **Nguyên tắc:** Bắt buộc lấy từ thẻ cha `ul` để mã không quét nhầm các liên kết bài viết khác nằm rải rác trên trang.
+*Thao tác F12:* Quan sát cây HTML thấy các chương được bọc trong danh sách `<ul class="list-chapter">`, mỗi chương là một thẻ `<li>` chứa thẻ `<a>`. Đi từ thẻ cha `ul` để tránh quét nhầm link rác.
 
 ```javascript
-// ==========================================
-// 📌 KHUNG CODE CHUNG (TEMPLATE)
-// ==========================================
-function execute(url) {
-    var res = fetch(url);
-    var doc = res.html();
-    var chaps = [];
-    
-    doc.select("KHỐI_BỌC_MỤC_LỤC THẺ_A").forEach(function(e) {
-        chaps.push({ name: e.text().trim(), url: e.attr("href"), host: "[https://domain.com](https://domain.com)" });
-    });
-    return Response.success(chaps);
-}
-```
-
-```javascript
-// ==========================================
-// 🎯 CODE THỰC TẾ (TRUYENMOIYY)
-// ==========================================
 function execute(url) {
     var res = fetch(url);
     if (!res.ok) return null;
     var doc = res.html('utf-8');
     var chaps = [];
     
-    // Quét chính xác các thẻ a nằm trong khối list-chapter
     doc.select(".list-chapter li a").forEach(function(e) {
         var link = e.attr("href");
         if (link.indexOf("http") !== 0) link = "[https://truyenmoiyy.com](https://truyenmoiyy.com)" + link;
@@ -343,42 +236,19 @@ function execute(url) {
 }
 ```
 
----
-
 ### 6. Trích xuất Nội dung Chữ (`src/chap.js`)
-**Mục đích:** Lấy đoạn văn bản thuần để đọc, vứt bỏ quảng cáo.
-**Thao tác F12:** Mở URL `https://truyenmoiyy.com/no-le-bong-toi-q7-lang-mo-ariel/chuong-1`. Trỏ vào một đoạn văn bản bất kỳ. Cây HTML chỉ ra rằng mọi đoạn `<p>` đều nằm chung trong một thẻ cha `<article class="chapter-content">`. Lấy toàn bộ khối `article` này để thu thập trọn vẹn văn bản.
+*Thao tác F12:* Nội dung văn bản thuần nằm trong `<article class="chapter-content">`. Tiến hành gỡ bỏ quảng cáo.
 
 ```javascript
-// ==========================================
-// 📌 KHUNG CODE CHUNG (TEMPLATE)
-// ==========================================
-function execute(url) {
-    var res = fetch(url);
-    var doc = res.html();
-    
-    var content = doc.select("KHỐI_BỌC_CHỮ").first();
-    // Tiêu diệt mã độc, quảng cáo
-    content.select("script, iframe, .ads").remove();
-    
-    return Response.success(content.html());
-}
-```
-
-```javascript
-// ==========================================
-// 🎯 CODE THỰC TẾ (TRUYENMOIYY)
-// ==========================================
 function execute(url) {
     var res = fetch(url);
     if (!res.ok) return null;
     var doc = res.html('utf-8');
     
-    // Lấy vùng chứa chữ chính
     var content = doc.select("article.chapter-content").first();
     if (!content) return null;
     
-    // LỌC RÁC: Dùng .remove() để triệt tiêu mã độc (script), quảng cáo (iframe, div mang class ads)
+    // LỌC RÁC: Dùng .remove() để cắt bỏ thẻ mã độc (script), quảng cáo (iframe, .ads)
     content.select("script, iframe, .ads").remove();
     
     return Response.success(content.html());
@@ -387,23 +257,22 @@ function execute(url) {
 
 ---
 
-## PHẦN 4: ĐÓNG GÓI VÀ XUẤT BẢN LÊN GITHUB
+## PHẦN IV: ĐÓNG GÓI VÀ XUẤT BẢN LÊN GITHUB
 
-Cần đẩy tiện ích lên kho lưu trữ GitHub và cấu hình tệp Danh bạ tổng (`plugin.json` định dạng Data Array) để cho phép thiết bị di động cài đặt từ xa thông qua một đường dẫn URL.
+Để người dùng cài đặt extension thông qua một đường dẫn URL, cần đẩy mã nguồn lên GitHub và tạo tệp Danh bạ tổng (`plugin.json` ở cấp cao nhất).
 
-### 1. Kiến trúc Kho lưu trữ (Repository)
-Tại Repository GitHub cá nhân (Ví dụ: `https://github.com/danpypk-hub/Vbook-ext-`), khởi tạo cấu trúc sau:
-
+**1. Kiến trúc Kho lưu trữ (Repository)**
+Tại Repo GitHub (VD: `https://github.com/danpypk-hub/Vbook-ext-`):
 ```text
 Vbook-ext-/
-├── truyenmoiyy_pro.zip    (File nén chứa toàn bộ mã nguồn extension đã đóng gói)
-├── icon_truyenmoiyy.png   (Ảnh đại diện hiển thị ngoài danh sách)
-└── plugin.json            (File Danh bạ tổng / Index File)
+├── truyenmoiyy_pro.zip    (File nén chứa mã nguồn extension)
+├── icon_truyenmoiyy.png   (Ảnh đại diện)
+└── plugin.json            (File Danh bạ Index dùng để load vào Vbook)
 ```
 
-### 2. Viết file Danh bạ `plugin.json` (Nằm ngoài cùng Repository)
-File này liệt kê toàn bộ các tiện ích có trong kho lưu trữ của bạn.
-*Lưu ý: Mọi đường dẫn trong trường `path` và `icon` bắt buộc phải là định dạng Raw Link. Lấy bằng cách bấm vào tệp trên giao diện GitHub và chọn nút **Raw**.*
+**2. Khai báo tệp Danh bạ `plugin.json` (Nằm ngoài cùng Repo)**
+File này liệt kê toàn bộ các tiện ích có trong kho lưu trữ.
+*(Lưu ý: Mọi đường dẫn trong `path` và `icon` bắt buộc phải là dạng Raw Link của GitHub).*
 
 ```json
 {
@@ -416,27 +285,34 @@ File này liệt kê toàn bộ các tiện ích có trong kho lưu trữ của 
             "name": "Truyện Mới YY",
             "author": "[Tên_Của_Bạn]",
             "path": "[https://raw.githubusercontent.com/danpypk-hub/Vbook-ext-/main/truyenmoiyy_pro.zip](https://raw.githubusercontent.com/danpypk-hub/Vbook-ext-/main/truyenmoiyy_pro.zip)",
-            "version": 0.1,
+            "version": 1,
             "source": "[https://truyenmoiyy.com](https://truyenmoiyy.com)",
             "icon": "[https://raw.githubusercontent.com/danpypk-hub/Vbook-ext-/main/icon_truyenmoiyy.png](https://raw.githubusercontent.com/danpypk-hub/Vbook-ext-/main/icon_truyenmoiyy.png)",
-            "description": "Tiện ích bóc tách tốc độ cao cho Truyện Mới YY.",
+            "description": "Tiện ích tốc độ cao cho Truyện Mới YY",
             "type": "novel"
         }
-        // Tiếp tục thêm cấu hình của các tiện ích khác vào mảng này...
     ]
 }
 ```
 
-### 3. Cài đặt vào ứng dụng Vbook
-1.  Mở ứng dụng Vbook -> Mục **Tiện ích (Extensions)** -> Nhấn dấu **+** -> Chọn **Thêm từ URL**.
-2.  Dán đường dẫn Raw của file Danh bạ vừa tạo:
-    `https://raw.githubusercontent.com/danpypk-hub/Vbook-ext-/main/plugin.json`
-3.  Ứng dụng tự động phân tích tệp JSON, hiển thị danh mục tiện ích và cho phép cài đặt với 1 chạm. Hệ thống sẽ tự động thông báo nhận diện bản cập nhật khi trường `version` trong tệp danh bạ thay đổi.
+**3. Cài đặt vào ứng dụng Vbook**
+1. Mở ứng dụng Vbook -> Mục **Tiện ích** -> Nhấn dấu **+** -> Chọn **Thêm từ URL**.
+2. Dán đường dẫn Raw của file Danh bạ: `https://raw.githubusercontent.com/danpypk-hub/Vbook-ext-/main/plugin.json`
+3. Ứng dụng sẽ hiển thị danh mục tiện ích và cho phép cài đặt.
 
 ---
 
-## 📌 GHI CHÚ KỸ THUẬT QUAN TRỌNG: VAR vs LET
-1.  **Bản chất Engine:** Ứng dụng Vbook sử dụng engine JavaScript nhúng trên thiết bị di động (như Rhino/QuickJS) được thiết kế tối giản nhằm tiết kiệm tài nguyên hệ thống (RAM).
-2.  **Chuẩn ES5:** Môi trường này **chỉ hỗ trợ và biên dịch được cú pháp chuẩn ES5**. Tuyệt đối không sử dụng các cú pháp JavaScript hiện đại của ES6+ như `let`, `const`, hoặc hàm mũi tên `() => {}`.
-3.  **Hậu quả:** Việc vi phạm chuẩn ES5 sẽ khiến hệ thống không thể đọc hiểu mã nguồn, lập tức văng lỗi `SyntaxError` và từ chối hoạt động.
-4.  **Quy tắc:** Mọi khai báo biến bắt buộc phải sử dụng từ khóa `var`. Mọi khai báo hàm bắt buộc sử dụng định dạng truyền thống `function() {}`.
+## PHẦN V: TIÊU CHUẨN KỸ THUẬT VÀ BEST PRACTICES
+
+### 1. Giới hạn ECMAScript 5 (ES5) - VAR vs LET
+Ứng dụng Vbook sử dụng engine JavaScript nhúng trên thiết bị di động (Rhino/QuickJS) được tối ưu để tiết kiệm RAM. Môi trường này **chỉ hỗ trợ cú pháp ES5**.
+* Tuyệt đối **KHÔNG** sử dụng `let`, `const`, hoặc hàm mũi tên `() => {}`. Hệ thống sẽ văng lỗi `SyntaxError` và từ chối nạp tiện ích.
+* **Quy tắc:** Chỉ sử dụng `var` để khai báo biến và `function() {}` để định nghĩa hàm.
+
+### 2. Checklist cho một Extension hoàn chỉnh
+- [ ] `plugin.json` có đầy đủ metadata hợp lệ.
+- [ ] Ảnh đại diện `icon.png` có kích thước 64x64px, vuông vức.
+- [ ] Hàm bắt lỗi linh hoạt (Kiểm tra `if (!res.ok)` để tránh crash).
+- [ ] URL luôn được chuẩn hóa (Bổ sung tiền tố `http` hoặc domain gốc nếu thiếu).
+- [ ] Đã sử dụng `content.select(rác).remove()` tại `chap.js`.
+- [ ] Đã kiểm thử thuật toán lật trang ở cả mục lục (TOC) và danh mục (GEN).
