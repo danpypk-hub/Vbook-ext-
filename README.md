@@ -1,5 +1,4 @@
-## Viết Vbook ext (Gemini)
-# Kiến thức được hệ thống hóa từ nền tảng HTML/CSS/JS, kỹ thuật cào dữ liệu (Web Scraping), đối chiếu API gốc và xuất bản lên GitHub.
+# Viết Vbook ext (Gemini hướng dẫn)
 
 > *Tham khảo mã nguồn các Vbook Extension hoàn thiện tại:* [https://github.com/dat-bi/ext-vbook](https://github.com/dat-bi/ext-vbook)
 
