@@ -1,4 +1,5 @@
-## Tài liệu hướng dẫn chi tiết quy trình phát triển tiện ích (Extension) cho ứng dụng Vbook. Kiến thức được hệ thống hóa từ nền tảng HTML/CSS/JS, kỹ thuật cào dữ liệu (Web Scraping), đối chiếu API gốc và xuất bản lên GitHub.
+## Viết Vbook ext (Gemini)
+# Kiến thức được hệ thống hóa từ nền tảng HTML/CSS/JS, kỹ thuật cào dữ liệu (Web Scraping), đối chiếu API gốc và xuất bản lên GitHub.
 
 > *Tham khảo mã nguồn các Vbook Extension hoàn thiện tại:* [https://github.com/dat-bi/ext-vbook](https://github.com/dat-bi/ext-vbook)
 
@@ -40,13 +41,29 @@ Ten_Extension.zip/
 
 Kỹ năng quan trọng nhất là xác định "Container" (Khối bọc) trên mã HTML thông qua DevTools (F12) của Chrome.
 
-
-
 1.  **Mở F12:** Nhấn phím `F12` trên trình duyệt Chrome. Chọn biểu tượng **Mũi tên** ở góc trái trên cùng.
 2.  **Xác định Container:** Rê chuột vào toàn bộ khung của 1 cuốn truyện. Đừng chỉ vào riêng cái tên hay tấm ảnh. Hãy tìm thẻ `<div>` hoặc `<li>` bọc trọn vẹn cả ảnh, tên, tác giả của cuốn truyện đó. 
 3.  **Tại sao phải tìm Container?** Để tạo vòng lặp. Nếu trang web có 20 truyện, ta ra lệnh cho JS "tìm 20 cái hộp (container) này, sau đó mở từng hộp ra để lấy tên và ảnh bên trong", như vậy dữ liệu sẽ không bao giờ bị râu ông nọ cắm cằm bà kia.
 
----
+### 1. Tại sao phải chiết xuất Container?
+Nếu bạn dùng `doc.select("a").attr("href")` để lấy link truyện, bạn sẽ lấy nhầm cả link trang chủ, link quảng cáo, link tác giả. Do đó, bạn phải tìm khối HTML bọc trọn vẹn 1 đối tượng, gọi là Container.
+
+### 2. Cách thực hiện (Ví dụ trên `gen.js` - Trang danh sách)
+1. Mở trang web (VD: `https://truyenmoiyy.com/danh-sach/truyen-moi`). Nhấn **F12** -> Chọn biểu tượng Mũi tên góc trái trên.
+2. Rê chuột vào **toàn bộ khung của 1 cuốn truyện**. Quan sát cây HTML, bạn sẽ thấy nó nằm trong một thẻ `<div class="row" itemscope>`.
+3. **Cách viết code:**
+   ```javascript
+   // 1. Dùng Container làm vòng lặp:
+   doc.select(".list-truyen .row[itemscope]").forEach(function(e) {
+// Biến 'e' lúc này đại diện cho duy nhất 1 truyện.
+       // 2. Chỉ truy xuất giá trị bên trong 'e', không dùng 'doc' nữa:
+       var name = e.select(".truyen-title a").text();
+       var cover = e.select("img[itemprop=image]").attr("src");
+   });
+   ```
+### 3. Cách lấy giá trị cho `detail.js` (Trang chi tiết)
+* F12 vào Tên truyện -> Copy class của thẻ tiêu đề (VD: `h1.story-title`).
+* F12 vào phần chứa Số chương -> Nếu web không bọc số chương bằng thẻ nào, hãy lấy toàn văn trang bằng `doc.text()` và sử dụng kỹ thuật Regex (Xem Phần V) để dò tìm cụm chữ "Số chương: XXX".
 
 ## PHẦN III: GIẢI PHẪU MÃ NGUỒN CÁC SCRIPT CHÍNH
 
