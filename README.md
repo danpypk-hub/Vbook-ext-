@@ -1,22 +1,24 @@
-# Gemini soạn cách tạo VBOOK EXTENSION
-
-Tài liệu hướng dẫn chi tiết quy trình phát triển tiện ích (Extension) cho ứng dụng Vbook. Kiến thức được hệ thống hóa từ khâu thiết lập môi trường, kỹ thuật cào dữ liệu (Web Scraping), đối chiếu API gốc và xuất bản lên GitHub.
+## Tài liệu hướng dẫn chi tiết quy trình phát triển tiện ích (Extension) cho ứng dụng Vbook. Kiến thức được hệ thống hóa từ nền tảng HTML/CSS/JS, kỹ thuật cào dữ liệu (Web Scraping), đối chiếu API gốc và xuất bản lên GitHub.
 
 > *Tham khảo mã nguồn các Vbook Extension hoàn thiện tại:* [https://github.com/dat-bi/ext-vbook](https://github.com/dat-bi/ext-vbook)
 
 ---
 
-## PHẦN I: TIÊU CHUẨN KIẾN TRÚC VÀ CHECKLIST BẮT BUỘC
+## PHẦN I: KIẾN THỨC NỀN TẢNG VÀ CHECKLIST BẮT BUỘC
 
-Một extension Vbook là một gói `.zip` chứa cấu trúc thư mục phân tầng. Để extension có thể cài đặt được, **bắt buộc tuân thủ Checklist sau:**
+Để làm extension, cần hiểu cơ bản về cấu trúc web:
+* **HTML:** Là bộ khung xương của trang web. Dữ liệu (chữ, ảnh) luôn được bọc trong các "thẻ" (tags) như `<div>`, `<a>` (chứa link), `<img>` (chứa ảnh), `<p>` (đoạn văn).
+* **CSS:** Là lớp áo trang trí. Các thẻ HTML thường được gắn tên để dễ nhận diện thông qua thuộc tính `class` hoặc `id` (Ví dụ: `<div class="truyen-title">`).
+* **JavaScript (JS):** Kịch bản dùng để ra lệnh cho máy tính "đi tìm thẻ HTML có class là `truyen-title` và lấy chữ bên trong ra". (Lưu ý: Vbook chỉ hỗ trợ JS chuẩn **ES5** - bắt buộc dùng `var` và `function`).
 
-- [ ] Tệp `plugin.json` phải nằm ở ngoài cùng (Root).
-- [ ] Ảnh đại diện `icon.png` (kích thước 64x64px, tỷ lệ 1:1) phải nằm ở ngoài cùng (Root).
-- [ ] Toàn bộ các file `.js` còn lại **BẮT BUỘC** phải nằm trong thư mục `src/`.
-- [ ] KHÔNG nén nguyên cả một thư mục cha, mà phải bôi đen `plugin.json`, `icon.png`, và thư mục `src` rồi chọn Add to archive (Zip).
-- [ ] Mọi file JavaScript phải tuân thủ chuẩn **ES5** (Luôn dùng `var` và `function()`. Tuyệt đối không dùng `let`, `const`, hoặc `=>`).
+### Checklist Cấu trúc Thư mục (Bắt buộc)
+Extension là một tệp `.zip` nén các file lại. Để cài đặt thành công, phải tuân thủ vị trí file:
 
-**Cấu trúc cây thư mục chuẩn:**
+- [ ] Tệp `plugin.json` (Hồ sơ cấu hình) phải nằm ngoài cùng (Root).
+- [ ] Ảnh `icon.png` (Kích thước 64x64px, tỷ lệ 1:1) phải nằm ngoài cùng (Root).
+- [ ] Toàn bộ các file `.js` còn lại **BẮT BUỘC** nằm trong thư mục `src/`.
+- [ ] Khi nén, chỉ bôi đen `plugin.json`, `icon.png` và thư mục `src` rồi chọn *Add to archive (.zip)*.
+
 ```text
 Ten_Extension.zip/
 ├── plugin.json       # Metadata và cấu hình (Bắt buộc)
@@ -34,302 +36,158 @@ Ten_Extension.zip/
 
 ---
 
-## PHẦN II: THỦ THUẬT ĐỌC SOURCE CODE & CHIẾT XUẤT CONTAINER (F12)
+## PHẦN II: THỦ THUẬT ĐỌC SOURCE CODE (F12 DEVTOOLS)
 
-Kỹ năng quan trọng nhất khi làm extension là biết cách xác định "Container" (Khối bọc) trên mã nguồn HTML thông qua công cụ DevTools (F12) của Chrome.
+Kỹ năng quan trọng nhất là xác định "Container" (Khối bọc) trên mã HTML thông qua DevTools (F12) của Chrome.
 
-### 1. Tại sao phải chiết xuất Container?
-Nếu bạn dùng `doc.select("a").attr("href")` để lấy link truyện, bạn sẽ lấy nhầm cả link trang chủ, link quảng cáo, link tác giả. Do đó, bạn phải tìm khối HTML bọc trọn vẹn 1 đối tượng, gọi là Container.
 
-### 2. Cách thực hiện (Ví dụ trên `gen.js` - Trang danh sách)
-1. Mở trang web (VD: `https://truyenmoiyy.com/danh-sach/truyen-moi`). Nhấn **F12** -> Chọn biểu tượng Mũi tên góc trái trên.
-2. Rê chuột vào **toàn bộ khung của 1 cuốn truyện**. Quan sát cây HTML, bạn sẽ thấy nó nằm trong một thẻ `<div class="row" itemscope>`.
-3. **Cách viết code:**
-   ```javascript
-   // 1. Dùng Container làm vòng lặp:
-   doc.select(".list-truyen .row[itemscope]").forEach(function(e) {
-       // Biến 'e' lúc này đại diện cho duy nhất 1 truyện.
-       // 2. Chỉ truy xuất giá trị bên trong 'e', không dùng 'doc' nữa:
-       var name = e.select(".truyen-title a").text();
-       var cover = e.select("img[itemprop=image]").attr("src");
-   });
-   ```
 
-### 3. Cách lấy giá trị cho `detail.js` (Trang chi tiết)
-* F12 vào Tên truyện -> Copy class của thẻ tiêu đề (VD: `h1.story-title`).
-* F12 vào phần chứa Số chương -> Nếu web không bọc số chương bằng thẻ nào, hãy lấy toàn văn trang bằng `doc.text()` và sử dụng kỹ thuật Regex (Xem Phần V) để dò tìm cụm chữ "Số chương: XXX".
+1.  **Mở F12:** Nhấn phím `F12` trên trình duyệt Chrome. Chọn biểu tượng **Mũi tên** ở góc trái trên cùng.
+2.  **Xác định Container:** Rê chuột vào toàn bộ khung của 1 cuốn truyện. Đừng chỉ vào riêng cái tên hay tấm ảnh. Hãy tìm thẻ `<div>` hoặc `<li>` bọc trọn vẹn cả ảnh, tên, tác giả của cuốn truyện đó. 
+3.  **Tại sao phải tìm Container?** Để tạo vòng lặp. Nếu trang web có 20 truyện, ta ra lệnh cho JS "tìm 20 cái hộp (container) này, sau đó mở từng hộp ra để lấy tên và ảnh bên trong", như vậy dữ liệu sẽ không bao giờ bị râu ông nọ cắm cằm bà kia.
 
 ---
 
 ## PHẦN III: GIẢI PHẪU MÃ NGUỒN CÁC SCRIPT CHÍNH
 
-Dưới đây là các tệp kịch bản. **[KHUNG CODE CHUẨN]** là mã gốc copy nguyên bản 100% từ tài liệu API chính thức của Vbook (giữ nguyên mọi chú thích định hướng). **[CODE THỰC TẾ]** là cách áp dụng chuẩn đó để code cho trang mẫu `truyenmoiyy.com`.
+Dưới đây là các tệp kịch bản. **[KHUNG CODE CHUẨN]** là mã gốc từ tài liệu Vbook API (giữ nguyên chú thích gốc). **[CODE THỰC TẾ]** minh họa cách ứng dụng trên trang `truyenmoiyy.com`, với các dòng code được dãn cách và giải thích nội tuyến.
 
 ### 1. Tệp Hồ sơ `plugin.json`
 
 **[KHUNG CODE CHUẨN - VBOOK API]**
 ```json
 {
-  "metadata": {
-    "name": "Tên Extension",
-    "author": "Tên tác giả", 
-    "version": 1,
-    "source": "[https://website.com](https://website.com)",
-    "regexp": "website\\.com/truyen/\\d+",
-    "description": "Mô tả extension",
-    "locale": "vi_VN",          // vi_VN, zh_CN, en_US, ja_JP
-    "language": "javascript",
-    "type": "novel",            // novel, comic, chinese_novel
-    "tag": "nsfw"              // Chỉ thêm nếu có nội dung 18+
-  },
-  "script": {
-    "home": "home.js",         // Trang chủ (tùy chọn)
-    "genre": "genre.js",       // Thể loại (tùy chọn)
-    "detail": "detail.js",     // Chi tiết truyện (bắt buộc)
-    "search": "search.js",     // Tìm kiếm (tùy chọn)
-    "page": "page.js",         // Phân trang mục lục (tùy chọn)
-    "toc": "toc.js",           // Mục lục (bắt buộc)
-    "chap": "chap.js"          // Nội dung chương (bắt buộc)
-  }
+    "metadata": {
+        "name": "Tên Extension",
+        "author": "Tên tác giả", 
+        "version": 1,
+        "source": "[https://website.com](https://website.com)",
+        "regexp": "website\\.com/truyen/\\d+",
+        "description": "Mô tả extension",
+        "locale": "vi_VN",          // vi_VN, zh_CN, en_US, ja_JP
+        "language": "javascript",
+        "type": "novel",            // novel, comic, chinese_novel
+        "tag": "nsfw"               // Chỉ thêm nếu có nội dung 18+
+    },
+    "script": {
+        "home": "home.js",          // Trang chủ (tùy chọn)
+        "genre": "genre.js",        // Thể loại (tùy chọn)
+        "detail": "detail.js",      // Chi tiết truyện (bắt buộc)
+        "search": "search.js",      // Tìm kiếm (tùy chọn)
+        "page": "page.js",          // Phân trang mục lục (tùy chọn)
+        "toc": "toc.js",            // Mục lục (bắt buộc)
+        "chap": "chap.js"           // Nội dung chương (bắt buộc)
+    }
 }
 ```
 
 **[CODE THỰC TẾ - TRUYENMOIYY.COM]**
 ```json
 {
-  "metadata": {
-    "name": "Truyện Mới YY",
-    "author": "Tên_Của_Bạn",
-    "version": 0.1,
-    "source": "[https://truyenmoiyy.com](https://truyenmoiyy.com)",
-    "regexp": "truyenmoiyy\\.com",
-    "description": "Tiện ích tối ưu tốc độ và cào dữ liệu cho Truyện Mới YY.",
-    "locale": "vi_VN",
-    "language": "javascript",
-    "type": "novel"
-  },
-  "script": {
-    "home": "home.js", "genre": "genre.js", "detail": "detail.js",
-    "page": "page.js", "toc": "toc.js", "chap": "chap.js", "search": "search.js"
-  }
+    "metadata": {
+        "name": "Truyện Mới YY",
+        "author": "Danpypk",
+        "version": 1,
+        "source": "[https://truyenmoiyy.com](https://truyenmoiyy.com)",
+        "regexp": "truyenmoiyy\\.com",
+        "description": "Tiện ích cào dữ liệu tối ưu cho Truyện Mới YY.",
+        "locale": "vi_VN",
+        "language": "javascript",
+        "type": "novel"
+    },
+    "script": {
+        "home": "home.js",
+        "genre": "genre.js",
+        "gen": "gen.js",
+        "detail": "detail.js",
+        "page": "page.js",
+        "toc": "toc.js",
+        "chap": "chap.js",
+        "search": "search.js"
+    }
 }
 ```
 
 ---
 
-### 2. Trang chủ & Khám phá (`home.js` & `genre.js`)
+### 2. Màn hình chính (`home.js`) & Khám phá (`genre.js`)
 
 **[KHUNG CODE CHUẨN - VBOOK API]**
 ```javascript
 // HOME.JS - Trang chủ:
 function execute() {
-    // Trả về danh sách các tab cho trang khám phá
     return Response.success([
         {
-            title: "Truyện mới",              // Tên hiển thị
-            input: "[https://website.com/new](https://website.com/new)", // URL đầu vào cho script
-            script: "gen.js"                  // Script xử lý
-        },
-        {
-            title: "Truyện hot", 
-            input: "[https://website.com/hot](https://website.com/hot)", 
-            script: "gen.js"
-        },
-        {
-            title: "Hoàn thành",
-            input: "[https://website.com/completed](https://website.com/completed)",
-            script: "gen.js"
+            title: "Truyện mới",              // Tên hiển thị trên app
+            input: "[https://website.com/new](https://website.com/new)", // URL đầu vào truyền cho script xử lý
+            script: "gen.js"                  // Tên file script sẽ nhận URL này
         }
     ]);
-}
-
-// GENRE.JS - Thể loại:
-function execute() {
-    let response = fetch("[https://website.com/genres](https://website.com/genres)");
-    if (!response.ok) return Response.error("Không thể lấy danh sách thể loại");
-    
-    let doc = response.html();
-    const genres = [];
-    
-    doc.select(".genre-list a").forEach(element => {
-        genres.push({
-            title: element.text(),            // Tên thể loại
-            input: element.attr("href"),      // URL thể loại
-            script: "gen.js"                  // Script xử lý
-        });
-    });
-    
-    return Response.success(genres);
-}
-```
-
-**[CODE THỰC TẾ - TRUYENMOIYY.COM]** *(Lưu ý: Thay thế `let/const` bằng `var`)*
-```javascript
-// --- src/home.js ---
-function execute() {
-    return Response.success([
-        { title: "Truyện Hot", input: "/danh-sach/truyen-hot", script: "gen.js" },
-        { title: "Mới Cập Nhật", input: "/danh-sach/truyen-moi", script: "gen.js" },
-        { title: "Truyện Full", input: "/danh-sach/truyen-full", script: "gen.js" }
-    ]);
-}
-
-// --- src/genre.js ---
-function execute() {
-    var res = fetch("[https://truyenmoiyy.com/](https://truyenmoiyy.com/)");
-    if (!res.ok) return null;
-    var doc = res.html('utf-8');
-    var data = [];
-    doc.select(".dropdown-menu.multi-column li a").forEach(function(e) {
-        data.push({
-            title: e.text().trim(),
-            input: e.attr("href"),
-            script: "gen.js"
-        });
-    });
-    return Response.success(data);
-}
-```
-
----
-
-### 3. Tìm kiếm (`search.js`)
-
-**[KHUNG CODE CHUẨN - VBOOK API]**
-```javascript
-// SEARCH.JS - Tìm kiếm:
-function execute(key, page) {
-    // NOTE: page phải là string, không phải number
-    if (!page) page = "1";
-    
-    // Encode search key
-    let encodedKey = encodeURIComponent(key);
-    
-    // Cho trang GBK encoding (tiếng Trung)
-    var gbkEncode = function(s) {
-        load('gbk.js');  // Tải từ [https://moleys.4everland.store/cdn/gbk.js](https://moleys.4everland.store/cdn/gbk.js)
-        return GBK.encode(s);
-    };
-    
-    let url = `https://website.com/search?q=${encodedKey}&page=${page}`;
-    let response = fetch(url);
-    
-    if (!response.ok) return Response.error("Tìm kiếm thất bại");
-    
-    let doc = response.html();
-    const data = [];
-    
-    doc.select(".search-result .item").forEach(element => {
-        let name = element.select(".title").text();
-        let link = element.select("a").attr("href");
-        let cover = element.select("img").attr("src");
-        
-        // Xử lý URL
-        if (cover && cover.startsWith("//")) cover = "https:" + cover;
-        if (link && !link.startsWith("http")) link = "[https://website.com](https://website.com)" + link;
-        
-        data.push({
-            name: name,
-            link: link,
-            cover: cover,
-            description: element.select(".description").text(),
-            host: "[https://website.com](https://website.com)"
-        });
-    });
-    
-    // Tìm trang tiếp theo
-    let nextPage = null;
-    let nextLink = doc.select("a.next").attr("href");
-    if (nextLink || data.length > 0) {
-        nextPage = (parseInt(page) + 1).toString();  // NOTE: next phải là string
-    }
-    
-    return Response.success(data, nextPage);
 }
 ```
 
 **[CODE THỰC TẾ - TRUYENMOIYY.COM]**
 ```javascript
-function execute(key, page) {
-    if (!page) page = '1';
-    var fetchUrl = "[https://truyenmoiyy.com/tim-kiem?tu-khoa=](https://truyenmoiyy.com/tim-kiem?tu-khoa=)" + key + "&trang=" + page;
-    var res = fetch(fetchUrl);
+// --- src/home.js ---
+// Không cần F12, chỉ cần copy các link muốn hiển thị ngay trên Tab trang chủ
+function execute() {
+    return Response.success([
+        { 
+            title: "Mới Cập Nhật", 
+            input: "/danh-sach/truyen-moi", 
+            script: "gen.js" 
+        },
+        { 
+            title: "Truyện Hot", 
+            input: "/danh-sach/truyen-hot", 
+            script: "gen.js" 
+        }
+    ]);
+}
+
+// --- src/genre.js ---
+// Dùng F12 soi vào thanh Menu của web để tự động cào toàn bộ danh sách Thể loại
+function execute() {
+    var res = fetch("[https://truyenmoiyy.com/](https://truyenmoiyy.com/)");
     if (!res.ok) return null;
     var doc = res.html('utf-8');
     var data = [];
-    doc.select(".list-truyen .row[itemscope]").forEach(function(e) {
-        var a = e.select(".truyen-title a").first();
-        var img = e.select("img[itemprop=image]").first();
-        var author = e.select(".author").first();
-        if (a && img) {
-            var link = a.attr("href");
-            if (link.indexOf("http") !== 0) link = "[https://truyenmoiyy.com](https://truyenmoiyy.com)" + link;
-            data.push({
-                name: a.text().trim(),
-                link: link,
-                cover: img.attr("src"),
-                description: author ? author.text().trim() : "",
-                host: "[https://truyenmoiyy.com](https://truyenmoiyy.com)"
-            });
-        }
+    
+    // CSS Selector: Tìm khối ul mang class 'dropdown-menu multi-column', lấy tất cả thẻ 'li a' bên trong
+    doc.select(".dropdown-menu.multi-column li a").forEach(function(e) {
+        data.push({
+            title: e.text().trim(),      // text() lấy chữ hiển thị (VD: Tiên Hiệp)
+            input: e.attr("href"),       // attr("href") lấy đường link ẩn bên trong thẻ <a>
+            script: "gen.js"             // Ném link này cho file gen.js xử lý
+        });
     });
-    var hasNext = doc.select(".pagination li a[rel=next]").length > 0;
-    if (hasNext) return Response.success(data, (parseInt(page) + 1).toString());
     return Response.success(data);
 }
 ```
 
 ---
 
-### 4. Danh sách truyện (`gen.js`)
+### 3. Danh sách truyện (`gen.js`)
 
 **[KHUNG CODE CHUẨN - VBOOK API]**
 ```javascript
-// GEN.JS - Script tổng quát:
 function execute(url, page) {
-    // NOTE: page phải là string
     if (!page) page = "1";
-    
-    // Xử lý URL
-    if (url.slice(-1) !== "/") {
-        url = url + "/";
-    }
-    url = url.replace("m.website.com", "[www.website.com](https://www.website.com)");
-    
-    // Build URL với page
-    let pageUrl = `${url}${page}.html`;
-    // Hoặc: let pageUrl = `${url}?page=${page}`;
-    
+    let pageUrl = `${url}?page=${page}`; // Cách phân trang phổ biến
     let response = fetch(pageUrl);
     if (!response.ok) return Response.error(`Không thể tải trang ${page}`);
     
     let doc = response.html();
     const data = [];
     
-    // Lấy danh sách truyện
+    // Vòng lặp lấy danh sách truyện từ Container
     doc.select(".book-list .item").forEach(element => {
         let name = element.select(".title a, h3 a").text();
         let link = element.select(".title a, h3 a").attr("href");
         let cover = element.select("img").attr("src");
         let description = element.select(".description, .summary").text();
         
-        // Skip nếu không có tên hoặc link
-        if (!name || !link) return;
-        
-        // Xử lý URLs
-        if (cover && cover.startsWith("//")) {
-            cover = "https:" + cover;
-        } else if (cover && cover.startsWith("/")) {
-            cover = "[https://website.com](https://website.com)" + cover;
-        }
-        
-        if (link && !link.startsWith("http")) {
-            if (link.startsWith("/")) {
-                link = "[https://website.com](https://website.com)" + link;
-            } else {
-                link = "[https://website.com/](https://website.com/)" + link;
-            }
-        }
+        if (!name || !link) return; // Bỏ qua nếu lỗi
         
         data.push({
             name: name,                       // Tên truyện (bắt buộc)
@@ -340,33 +198,12 @@ function execute(url, page) {
         });
     });
     
-    // Tìm trang tiếp theo
     let nextPage = null;
-    
-    // Cách 1: Từ link next
+    // Tìm nút Next để lật trang
     let nextLink = doc.select("a.next, a:contains(下一页), a:contains(Next)").attr("href");
     if (nextLink) {
         let pageNum = nextLink.match(/(\d+)/);
-        if (pageNum) {
-            nextPage = pageNum[1];
-        }
-    }
-    
-    // Cách 2: Tự tăng page number
-    if (!nextPage && data.length > 0) {
-        let currentPageNum = parseInt(page);
-        let maxPageElement = doc.select(".pagination .last, .last-page");
-        
-        if (maxPageElement.size() > 0) {
-            let maxPageText = maxPageElement.text();
-            let maxPageNum = parseInt(maxPageText);
-            if (currentPageNum < maxPageNum) {
-                nextPage = (currentPageNum + 1).toString();
-            }
-        } else {
-            // Giả sử có trang tiếp theo nếu có data
-            nextPage = (currentPageNum + 1).toString();
-        }
+        if (pageNum) nextPage = pageNum[1];
     }
     
     return Response.success(data, nextPage);
@@ -377,34 +214,48 @@ function execute(url, page) {
 ```javascript
 function execute(url, page) {
     if (!page) page = '1';
+    
+    // Chuẩn hóa URL: Web này dùng định dạng "/trang-1" thay vì "?page=1"
     var fetchUrl = url;
-    if (fetchUrl.indexOf("http") !== 0) fetchUrl = "[https://truyenmoiyy.com](https://truyenmoiyy.com)" + url;
-    fetchUrl = fetchUrl + "/trang-" + page; // Định dạng URL riêng của trang web
+    if (fetchUrl.indexOf("http") !== 0) {
+        fetchUrl = "[https://truyenmoiyy.com](https://truyenmoiyy.com)" + url;
+    }
+    fetchUrl = fetchUrl + "/trang-" + page;
 
     var res = fetch(fetchUrl);
     if (!res.ok) return null;
     var doc = res.html('utf-8');
     var data = [];
 
+    // TÌM CONTAINER: F12 chỉ ra mỗi truyện được bọc trong <div class="row" itemscope> nằm trong <div class="list-truyen">
     doc.select(".list-truyen .row[itemscope]").forEach(function(e) {
-        var a = e.select(".truyen-title a").first();
-        var img = e.select("img[itemprop=image]").first();
-        var author = e.select(".author").first();
+        
+        // Từ Container 'e', tìm xuống các thẻ con
+        var a = e.select(".truyen-title a").first();      // Thẻ <a> chứa Tên và Link
+        var img = e.select("img[itemprop=image]").first();// Thẻ <img> chứa Ảnh bìa
+        var author = e.select(".author").first();         // Thẻ chứa Tên tác giả
+        
         if (a && img) {
             var link = a.attr("href");
+            // Đảm bảo link luôn là link tuyệt đối (có http)
             if (link.indexOf("http") !== 0) link = "[https://truyenmoiyy.com](https://truyenmoiyy.com)" + link;
+            
             data.push({
-                name: a.text().trim(),
-                link: link,
-                cover: img.attr("src"),
-                description: author ? author.text().trim() : "",
+                name: a.text().trim(),                     // Lấy tên truyện
+                link: link,                                // Lấy link truyện
+                cover: img.attr("src"),                    // Lấy link ảnh
+                description: author ? author.text().trim() : "", 
                 host: "[https://truyenmoiyy.com](https://truyenmoiyy.com)"
             });
         }
     });
 
+    // LẬT TRANG: Tìm thẻ <a> có thuộc tính rel="next"
     var hasNext = doc.select(".pagination li a[rel=next]").length > 0;
-    if (hasNext) return Response.success(data, (parseInt(page) + 1).toString());
+    if (hasNext) {
+        // Trả về dữ liệu và báo cho app biết trang tiếp theo là page + 1
+        return Response.success(data, (parseInt(page) + 1).toString());
+    }
     
     return Response.success(data);
 }
@@ -412,55 +263,26 @@ function execute(url, page) {
 
 ---
 
-### 5. Chi tiết truyện (`detail.js`)
+### 4. Chi tiết truyện (`detail.js`)
 
 **[KHUNG CODE CHUẨN - VBOOK API]**
 ```javascript
-// DETAIL.JS - Chi tiết truyện:
 function execute(url) {
-    // NOTE: App tự động bỏ / cuối URL
     url = url.replace("m.website.com", "[www.website.com](https://www.website.com)");
-    
     let response = fetch(url);
-    if (!response.ok) return Response.error("Không thể tải trang chi tiết");
-    
     let doc = response.html();
     
-    // Lấy thông tin cơ bản
+    // Lấy thông tin cơ bản bằng các selector thông dụng
     let name = doc.select("h1.title, .book-title").text();
     let cover = doc.select(".cover img, .book-cover img").attr("src");
-    let author = doc.select(".author, .book-author").text()
-                    .replace(/Tác giả:\s*/g, "")
-                    .replace(/作者:\s*/g, "");
+    let author = doc.select(".author, .book-author").text().replace(/Tác giả:\s*/g, "");
     let description = doc.select(".description, .book-desc").html();
     let status = doc.select(".status, .book-status").text();
     
-    // Xử lý cover URL
-    if (cover) {
-        if (cover.startsWith("//")) {
-            cover = "https:" + cover;
-        } else if (cover.startsWith("/")) {
-            cover = "[https://website.com](https://website.com)" + cover;
-        } else if (!cover.startsWith("http")) {
-            cover = "[https://website.com/](https://website.com/)" + cover;
-        }
-    }
-    
-    // Xử lý trạng thái ongoing
     let ongoing = true;
-    if (status.includes("Hoàn thành") || status.includes("Completed") || 
-        status.includes("完结") || status.includes("End")) {
-        ongoing = false;
-    }
+    if (status.includes("Hoàn thành") || status.includes("Completed")) ongoing = false;
     
-    // Thông tin chi tiết
-    let detail = `Tác giả: ${author}<br>`;
-    detail += `Trạng thái: ${status}<br>`;
-    detail += doc.select(".book-info, .novel-info").text();
-    
-    // Lấy book ID cho các script khác
-    let bookId = url.match(/\/(\d+)(?:\/|\.html|$)/);
-    bookId = bookId ? bookId[1] : "";
+    let detail = `Tác giả: ${author}<br>Trạng thái: ${status}<br>`;
     
     return Response.success({
         name: name,                           // Tên truyện (bắt buộc)
@@ -469,24 +291,7 @@ function execute(url) {
         author: author,                       // Tác giả
         description: description,             // Mô tả HTML
         detail: detail,                       // Thông tin chi tiết
-        ongoing: ongoing,                     // true = đang ra, false = hoàn thành
-        
-        // Các phần tùy chọn
-        genres: [{                           // Thể loại liên quan
-            title: "Cùng thể loại",
-            input: "[https://website.com/genre/action](https://website.com/genre/action)",
-            script: "gen.js"
-        }],
-        suggests: [{                         // Truyện đề xuất
-            title: "Truyện liên quan",
-            input: `https://website.com/related/${bookId}`,
-            script: "gen.js"  
-        }],
-        comments: [{                         // Comments
-            title: "Bình luận",
-            input: url,
-            script: "comment.js"
-        }]
+        ongoing: ongoing                      // true = đang ra, false = hoàn thành
     });
 }
 ```
@@ -498,54 +303,243 @@ function execute(url) {
     if (!res.ok) return null;
     var doc = res.html('utf-8');
     
+    // Lấy Tên: Thử lấy class .story-title, nếu web đổi thì lấy thẻ h1 làm dự phòng (||)
     var name = doc.select(".story-title").text().trim() || doc.select("h1").text().trim();
+    
+    // Lấy Ảnh: Ưu tiên lấy thẻ meta og:image trên Header của HTML vì đây là ảnh nét nhất
     var cover = doc.select(".book img").first().attr("src") || doc.select("meta[property='og:image']").attr("content");
     if (cover && cover.indexOf("http") !== 0) cover = "[https://truyenmoiyy.com](https://truyenmoiyy.com)" + cover;
     
+    // Lấy Tác giả:
     var authorEl = doc.select("[itemprop=author] [itemprop=name]").first() || doc.select(".author").first();
+    // Dùng Regex xóa cụm từ "Tác giả:" bị dính liền trong text
     var author = authorEl ? authorEl.text().replace(/Tác giả\s*:/i, "").trim() : "Đang cập nhật";
     
-    var genres = [];
-    var genreNames = [];
-    doc.select(".info a[itemprop=genre], .info a[href*='the-loai']").forEach(function(e) {
-        var gName = e.text().trim();
-        var gLink = e.attr("href");
-        if (gLink.indexOf("http") !== 0) gLink = "[https://truyenmoiyy.com](https://truyenmoiyy.com)" + gLink;
-        genres.push({ title: gName, input: gLink, script: "gen.js" });
-        genreNames.push(gName);
-    });
-    
-    var rawText = doc.text();
-    var status = rawText.indexOf("Hoàn thành") !== -1 ? "Hoàn thành" : "Đang ra";
-    
+    // Lấy Số chương: Do HTML thường bị vỡ, lấy TOÀN BỘ CHỮ trên web và dùng Regex quét
+    var rawText = doc.text(); 
     var chapters = "Đang cập nhật";
+    // Biểu thức Regex tìm cụm "Số chương: 100" hoặc "Số chương 100"
     var chapMatch = rawText.match(/Số [Cc]hương[\s:]*([\d,.]+)/);
     if (chapMatch) chapters = chapMatch[1] + " chương";
-    else {
-        var latestChap = doc.select("ul.l-chapters li a, .latest-chapter a").first().text();
-        if (latestChap) {
-            var m = latestChap.match(/Chương\s*(\d+)/i);
-            if (m) chapters = m[1] + " chương";
-        }
-    }
     
     var detailInfo = [
         "👤 Tác giả: " + author,
-        "ℹ️ Tình trạng: " + status,
-        "📊 Số chương: " + chapters,
-        "🏷️ Thể loại: " + (genreNames.length > 0 ? genreNames.join(", ") : "Chưa rõ")
+        "📊 Số chương: " + chapters
     ];
-    
+
     return Response.success({
         name: name,
         cover: cover,
         author: author,
-        description: doc.select(".desc-text").html() || "Đang cập nhật mô tả...",
+        description: doc.select(".desc-text").text().trim(), // Vị trí khối thẻ mô tả
         detail: detailInfo.join("<br>"),
-        genres: genres,
         host: "[https://truyenmoiyy.com](https://truyenmoiyy.com)"
     });
 }
 ```
 
--
+---
+
+### 5. Mục lục (`toc.js`)
+
+**[KHUNG CODE CHUẨN - VBOOK API]**
+```javascript
+function execute(url) {
+    let response = fetch(url);
+    let doc = response.html();
+    const chapters = [];
+    
+    // Lấy danh sách chương - thử các selector khác nhau
+    let chapterElements = doc.select(".chapter-list a");
+    if (chapterElements.size() === 0) {
+        chapterElements = doc.select("#list a, .volume-chapters a, .chapter-item a");
+    }
+    
+    chapterElements.forEach(element => {
+        let name = element.text().trim();
+        let chapterUrl = element.attr("href");
+        if (!name || !chapterUrl) return;
+        
+        chapters.push({
+            name: name,                       // Tên chương (bắt buộc)
+            url: chapterUrl,                  // URL chương (bắt buộc) 
+            host: "[https://website.com](https://website.com)"       
+        });
+    });
+    return Response.success(chapters);
+}
+```
+
+**[CODE THỰC TẾ - TRUYENMOIYY.COM]**
+```javascript
+function execute(url) {
+    var res = fetch(url);
+    if (!res.ok) return null;
+    var doc = res.html('utf-8');
+    var chaps = [];
+    
+    // F12: Các chương nằm trong danh sách <ul> có class 'list-chapter'
+    // Đi từ thẻ cha để tuyệt đối không quét nhầm link quảng cáo bên ngoài
+    doc.select(".list-chapter li a").forEach(function(e) {
+        var link = e.attr("href");
+        if (link.indexOf("http") !== 0) link = "[https://truyenmoiyy.com](https://truyenmoiyy.com)" + link;
+        
+        chaps.push({
+            name: e.select(".chapter-text").text().trim(), // Tên chương
+            url: link,                                     // Link chương
+            host: "[https://truyenmoiyy.com](https://truyenmoiyy.com)"
+        });
+    });
+    
+    return Response.success(chaps);
+}
+```
+
+---
+
+### 6. Nội dung chương (`chap.js`)
+
+**[KHUNG CODE CHUẨN - VBOOK API]**
+```javascript
+function execute(url) {
+    let response = fetch(url);
+    let doc = response.html();
+    
+    // LỌC RÁC QUAN TRỌNG: Xóa các phần không cần thiết
+    doc.select(".ads, .advertisement, .banner, script, style, .comment").remove();
+    
+    let content = doc.select("#content").html();
+    if (!content) content = doc.select(".chapter-content").html();
+    
+    // Clean nội dung bằng Regex
+    content = content.replace(/&nbsp;/g, " ");
+    content = content.replace(/\s+/g, " ");
+    content = content.trim();
+    
+    return Response.success(content);
+}
+```
+
+**[CODE THỰC TẾ - TRUYENMOIYY.COM]**
+```javascript
+function execute(url) {
+    var res = fetch(url);
+    if (!res.ok) return null;
+    var doc = res.html('utf-8');
+    
+    // F12: Xác định khối HTML bọc duy nhất phần chữ để đọc
+    var content = doc.select("article.chapter-content").first();
+    if (!content) return null;
+    
+    // BỘ LỌC RÁC: Dùng .remove() để cắt bỏ thẻ mã độc (script), quảng cáo (iframe), và div chứa QC (.ads)
+    content.select("script, iframe, .ads").remove();
+    
+    // Trả về HTML đã sạch sẽ, Vbook sẽ tự động hiển thị thành văn bản đọc
+    return Response.success(content.html());
+}
+```
+
+---
+
+## PHẦN IV: THƯ VIỆN SNIPPETS CỰC KỲ HỮU ÍCH (JSOUP & REGEX)
+*(Trích xuất từ tài liệu `vbook-snippet-Mol.txt`)*
+
+**1. Kỹ thuật Jsoup (Bộ chọn HTML)**
+```javascript
+// Xóa một phần tử theo ID
+doc.select("#contentdp").remove();
+
+// Lấy nội dung từ thẻ meta (Thường dùng lấy ảnh bìa HD, hoặc lấy mô tả)
+doc.select('meta[property="og:novel:author"]').attr("content");
+
+// Lấy phần tử theo vị trí (Rất hay dùng khi tên class bị trùng lặp)
+doc.select(".item").first(); // Lấy cái đầu tiên
+doc.select(".item").last();  // Lấy cái cuối cùng
+doc.select(".item").get(0);  // Lấy cái ở vị trí số 0 (index)
+
+// Tìm thẻ <a> chứa đoạn chữ cụ thể (Cực hữu ích để tìm nút Next phân trang)
+doc.select("a:contains(下一页)").first().attr("href");
+doc.select("a:contains(Trang tiếp)").first().attr("href");
+```
+
+**2. Kỹ thuật Xử lý Chuỗi (String)**
+```javascript
+// Thêm dấu "/" vào cuối URL nếu chưa có
+if(url.slice(-1) !== "/") url = url + "/";
+
+// Kiểm tra xem chuỗi có chứa từ khóa không
+if (url.indexOf("string") !== -1) { /* Có chứa */ }
+
+// Lấy ID cuối cùng của một URL (VD: [domain.com/truyen-a/000124](https://domain.com/truyen-a/000124) => lấy 000124)
+let id = url.split(/[\/ ]+/).pop();
+
+// Chuyển đối tượng JSON thành chuỗi (Stringify) và ngược lại (Parse)
+var stringData = JSON.stringify(obj);
+var jsonObject = JSON.parse(stringData);
+```
+
+**3. Hàm Slugify (Tạo link chuẩn từ Tiếng Việt)**
+```javascript
+// Biến "tôi là ai" thành "toi-la-ai" để nhét vào URL
+function slugify(e) {
+    var a="àáäâãåăæąçćčđďèéěėëêęğǵḧìíïîįłḿǹńňñòóöôœøṕŕřßşśšșťțùúüûǘůűūųẃẍÿýźžż·/_,:;";
+    var r=new RegExp(a.split("").join("|"),"g");
+    return e.toString().toLowerCase()
+        .replace(/á|à|ả|ạ|ã|ă|ắ|ằ|ẳ|ẵ|ặ|â|ấ|ầ|ẩ|ẫ|ậ/gi,"a")
+        .replace(/é|è|ẻ|ẽ|ẹ|ê|ế|ề|ể|ễ|ệ/gi,"e")
+        .replace(/i|í|ì|ỉ|ĩ|ị/gi,"i")
+        .replace(/ó|ò|ỏ|õ|ọ|ô|ố|ồ|ổ|ỗ|ộ|ơ|ớ|ờ|ở|ở|ỡ|ợ/gi,"o")
+        .replace(/ú|ù|ủ|ũ|ụ|ư|ứ|ừ|ử|ữ|ự/gi,"u")
+        .replace(/ý|ỳ|ỷ|ỹ|ỵ/gi,"y").replace(/đ/gi,"d")
+        .replace(/\s+/g,"-").replace(r,e=>"aaaaaaaaacccddeeeeeeegghiiiiilmnnnnooooooprrsssssttuuuuuuuuuwxyyzzz------".charAt(a.indexOf(e)))
+        .replace(/&/g,"-and-").replace(/[^\w\-]+/g,"")
+        .replace(/\-\-+/g,"-").replace(/^-+/,"").replace(/-+$/,"");
+}
+```
+
+---
+
+## PHẦN V: ĐÓNG GÓI VÀ XUẤT BẢN LÊN GITHUB
+
+Để chia sẻ extension, bạn cần đẩy mã nguồn lên GitHub và tạo một tệp `plugin.json` tổng đóng vai trò như một kho (Store).
+
+### 1. Chuẩn bị kho lưu trữ bằng GitHub Desktop & VSCode
+1. Truy cập GitHub, tạo Repository (VD: `Vbook-ext-`).
+2. Mở phần mềm **GitHub Desktop** trên máy tính, chọn *Clone a repository* để tải repo đó về thư mục nội bộ.
+3. Mở thư mục nội bộ đó bằng **VSCode**. Chép tệp `truyenmoiyy_pro.zip` và `icon_truyenmoiyy.png` vào.
+
+### 2. Khai báo tệp Danh bạ tổng (`plugin.json` ở Root Repo)
+Tại thư mục gốc, tạo tệp `plugin.json`. Tệp này khai báo mảng `data` chứa tất cả các tiện ích của bạn.
+*Lưu ý quan trọng: Thuộc tính `path` và `icon` BẮT BUỘC phải dùng định dạng Raw Link của GitHub (có tiền tố `raw.githubusercontent.com`). Lấy link này bằng cách bấm vào tệp trên web GitHub -> Nhấn nút **Raw**.*
+
+```json
+{
+    "metadata": {
+        "author": "Danpypk",
+        "description": "Kho tiện ích Vbook cá nhân"
+    },
+    "data": [
+        {
+            "name": "Truyện Mới YY",
+            "author": "Danpypk",
+            "path": "[https://raw.githubusercontent.com/danpypk-hub/Vbook-ext-/main/truyenmoiyy_pro.zip](https://raw.githubusercontent.com/danpypk-hub/Vbook-ext-/main/truyenmoiyy_pro.zip)",
+            "version": 1,
+            "source": "[https://truyenmoiyy.com](https://truyenmoiyy.com)",
+ "icon": "[https://raw.githubusercontent.com/danpypk-hub/Vbook-ext-/main/icon_truyenmoiyy.png](https://raw.githubusercontent.com/danpypk-hub/Vbook-ext-/main/icon_truyenmoiyy.png)",
+            "description": "Tiện ích tốc độ cao cho Truyện Mới YY.",
+            "type": "novel"
+        }
+        // Có thể phẩy (,) và dán khối tương tự để thêm extension thứ 2, 3...
+    ]
+}
+```
+
+### 3. Đẩy lên GitHub (Push)
+* **Trên VSCode:** Bấm icon *Source Control* (cột trái) -> Bấm dấu `+` -> Nhập message commit -> Bấm `Commit` -> Bấm `Sync Changes`.
+* **Trên GitHub Desktop:** Xem thay đổi ở cột trái -> Nhập Summary ở góc trái dưới -> Bấm `Commit to main` -> Bấm `Push origin` ở thanh trên cùng.
+ ### 4. Link Import cho ứng dụng Vbook
+Để người dùng tự động cài đặt tất cả tiện ích trong kho của bạn:
+1. Mở app Vbook -> **Tiện ích** -> Nhấn dấu **+** -> **Thêm từ URL**.
+2. Dán đường dẫn Raw của tệp Danh bạ tổng vừa tạo. Cú pháp bắt buộc:
+   `https://raw.githubusercontent.com/danpypk-hub/Vbook-ext-/main/plugin.json`
+3. Ứng dụng sẽ hiển thị danh mục và tự động thông báo cập nhật khi `version` thay đổi.
