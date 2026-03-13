@@ -1,0 +1,20 @@
+{
+  "metadata": {
+    "author": "@R",
+    "description": "@R's repository"
+  },
+  "data": [
+    {
+      "name": "Mê truyện hot",
+      "author": "@R",
+      "version": 1,
+      "source": "https://www.metruyenhot.com",
+      "path": "https://raw.githubusercontent.com/danpypk-hub/Vbook-ext-/main/metruyenhot.zip",
+     
+      "description": "Đọc truyện trên trang metruyenhot.com",
+      "type": "novel",
+      "locale": "vi_VN"
+    },
+    
+  ]
+}
